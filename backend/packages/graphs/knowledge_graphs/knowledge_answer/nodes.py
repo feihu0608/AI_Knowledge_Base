@@ -7,7 +7,7 @@ from .state import AnswerState
 
 def build_nodes(runtime: AnswerRuntime):
     def plan_query(state: AnswerState) -> dict:
-        result = runtime.runner.run(QUERY_PLANNER, {"question": state["question"]})
+        result = runtime.runner.run(QUERY_PLANNER, {"question": state["question"], "conversation_history": state.get("conversation_history", [])})
         return {"plan": result.output.model_dump(), "status": "planned"}
 
     def retrieve_local(state: AnswerState) -> dict:
@@ -49,7 +49,9 @@ def build_nodes(runtime: AnswerRuntime):
 
     def write_answer(state: AnswerState) -> dict:
         result = runtime.runner.run(ANSWER_WRITER, {
-            "question": state["question"], "evidence": state.get("fused_evidence", [])
+            "question": state["question"], "evidence": state.get("fused_evidence", []),
+            "conversation_history": state.get("conversation_history", []),
+            "available_services": ["基于授权知识库检索并引用文档", "多轮对话与上下文追问", "FAQ 标准问答", "文档导入、解析与向量化", "部门与角色权限控制"],
         })
         return {"answer": result.output.answer, "citation_ids": result.output.citation_ids, "status": "drafted"}
 

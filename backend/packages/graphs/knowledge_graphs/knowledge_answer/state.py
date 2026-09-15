@@ -8,6 +8,7 @@ class AnswerState(TypedDict):
     user_id: str
     question: str
     provider_mode: str
+    conversation_history: NotRequired[list[dict]]
     local_evidence: NotRequired[list[dict]]
     mcp_evidence: NotRequired[list[dict]]
     general_evidence: NotRequired[list[dict]]

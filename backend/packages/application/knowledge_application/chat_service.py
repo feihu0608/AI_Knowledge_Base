@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from knowledge_domain.authorization.models import AccessContext
@@ -50,10 +51,16 @@ class ChatApplicationService:
             request_id=request_id, role="user", status="succeeded", content=question,
         )
         session.add(user_message)
+        history_rows = session.scalars(
+            select(Message).where(Message.tenant_id == context.tenant_id, Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc()).limit(9)
+        ).all()
+        history = [{"role": item.role, "content": item.content} for item in reversed(history_rows[:-1])]
         try:
             result = self.answer_graph.invoke({
                 "tenant_id": context.tenant_id, "user_id": context.user_id, "question": question,
                 "provider_mode": self.provider_mode, "status": "requested",
+                "conversation_history": history,
             })
             assistant_id = str(uuid4())
             assistant = Message(
