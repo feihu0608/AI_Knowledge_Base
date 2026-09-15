@@ -20,6 +20,10 @@ class DepartmentRequest(BaseModel):
     parent_id: str | None = None
 
 
+class DepartmentUpdateRequest(DepartmentRequest):
+    pass
+
+
 class UserUpdateRequest(BaseModel):
     active: bool | None = None
     department_id: str | None = None
@@ -131,6 +135,69 @@ def create_department(payload: DepartmentRequest, context: AccessContext = Depen
     return {"id": row.id, "parent_id": row.parent_id, "name": row.name, "status": row.status}
 
 
+@router.patch("/departments/{department_id}")
+def update_department(department_id: str, payload: DepartmentUpdateRequest, context: AccessContext = Depends(require_permission("organization.admin")), session: Session = Depends(get_session)) -> dict:
+    row = session.get(Department, (context.tenant_id, department_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="department not found")
+    name = _required_text(payload.name, "部门名称")
+    parent_id = (payload.parent_id or "").strip() or None
+    if parent_id == department_id:
+        raise HTTPException(status_code=400, detail="上级部门不能是自身")
+    if parent_id and session.get(Department, (context.tenant_id, parent_id)) is None:
+        raise HTTPException(status_code=404, detail="parent department not found")
+    if parent_id and session.scalar(select(DepartmentClosure).where(
+        DepartmentClosure.tenant_id == context.tenant_id,
+        DepartmentClosure.ancestor_id == department_id,
+        DepartmentClosure.descendant_id == parent_id,
+    )):
+        raise HTTPException(status_code=400, detail="上级部门不能设置为当前部门的下级")
+    duplicate = _same_level_department(session, tenant_id=context.tenant_id, parent_id=parent_id, name=name)
+    if duplicate and duplicate.id != department_id:
+        raise HTTPException(status_code=409, detail="同一上级部门下已存在同名部门")
+    row.name, row.parent_id = name, parent_id
+    try:
+        # Rebuild closure paths after a move so permission inheritance remains correct.
+        session.query(DepartmentClosure).filter(DepartmentClosure.tenant_id == context.tenant_id).delete(synchronize_session=False)
+        session.flush()
+        all_departments = session.scalars(select(Department).where(Department.tenant_id == context.tenant_id)).all()
+        by_parent: dict[str | None, list[Department]] = {}
+        for department in all_departments:
+            by_parent.setdefault(department.parent_id, []).append(department)
+        def add_tree(parent: Department | None, ancestors: list[tuple[str, int]]) -> None:
+            for department in by_parent.get(parent.id if parent else None, []):
+                session.add(DepartmentClosure(tenant_id=context.tenant_id, ancestor_id=department.id, descendant_id=department.id, depth=0))
+                for ancestor_id, depth in ancestors:
+                    session.add(DepartmentClosure(tenant_id=context.tenant_id, ancestor_id=ancestor_id, descendant_id=department.id, depth=depth + 1))
+                add_tree(department, [(ancestor_id, depth + 1) for ancestor_id, depth in ancestors] + [(department.id, 0)])
+        add_tree(None, [])
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="部门更新冲突，请刷新后重试") from exc
+    return {"id": row.id, "parent_id": row.parent_id, "name": row.name, "status": row.status}
+
+
+@router.delete("/departments/{department_id}")
+def delete_department(department_id: str, context: AccessContext = Depends(require_permission("organization.admin")), session: Session = Depends(get_session)) -> dict:
+    row = session.get(Department, (context.tenant_id, department_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="department not found")
+    if row.parent_id is None:
+        raise HTTPException(status_code=400, detail="顶级部门不可删除")
+    if session.scalar(select(Department).where(Department.tenant_id == context.tenant_id, Department.parent_id == department_id)):
+        raise HTTPException(status_code=409, detail="请先删除或移动子部门")
+    if session.scalar(select(User).where(User.tenant_id == context.tenant_id, User.department_id == department_id)):
+        raise HTTPException(status_code=409, detail="部门仍有用户，请先转移用户")
+    session.query(DepartmentClosure).filter(
+        DepartmentClosure.tenant_id == context.tenant_id,
+        (DepartmentClosure.ancestor_id == department_id) | (DepartmentClosure.descendant_id == department_id),
+    ).delete(synchronize_session=False)
+    session.delete(row)
+    session.commit()
+    return {"id": department_id, "deleted": True}
+
+
 @router.get("/users")
 def list_users(context: AccessContext = Depends(require_permission("organization.read")), session: Session = Depends(get_session)) -> list[dict]:
     rows = session.scalars(select(User).where(User.tenant_id == context.tenant_id).order_by(User.username)).all()
@@ -204,6 +271,19 @@ def update_user(user_id: str, payload: UserUpdateRequest, context: AccessContext
         session.rollback()
         raise HTTPException(status_code=409, detail="用户更新冲突，请刷新后重试") from exc
     return {"id": row.id, "active": row.active, "department_id": row.department_id, "authz_version": row.authz_version}
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: str, context: AccessContext = Depends(require_permission("organization.admin")), session: Session = Depends(get_session)) -> dict:
+    row = session.get(User, (context.tenant_id, user_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    if row.id == context.user_id:
+        raise HTTPException(status_code=400, detail="不能删除当前登录用户")
+    session.query(UserRole).filter(UserRole.tenant_id == context.tenant_id, UserRole.user_id == user_id).delete(synchronize_session=False)
+    session.delete(row)
+    session.commit()
+    return {"id": user_id, "deleted": True}
 
 
 @router.post("/users")
