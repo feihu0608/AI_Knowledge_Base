@@ -76,6 +76,8 @@ def list_users(context: AccessContext = Depends(require_permission("organization
 def update_user(user_id: str, payload: UserUpdateRequest, context: AccessContext = Depends(require_permission("organization.admin")), session: Session = Depends(get_session)) -> dict:
     row = session.get(User, (context.tenant_id, user_id))
     if row is None: raise HTTPException(status_code=404, detail="user not found")
+    if payload.active is False and row.id == context.user_id:
+        raise HTTPException(status_code=400, detail="cannot deactivate current user")
     if payload.active is not None: row.active = payload.active
     if payload.department_id is not None:
         if session.get(Department, (context.tenant_id, payload.department_id)) is None: raise HTTPException(status_code=404, detail="department not found")
