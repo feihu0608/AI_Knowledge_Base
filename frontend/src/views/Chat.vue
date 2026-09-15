@@ -1,0 +1,6 @@
+<script setup>
+import { ref } from 'vue'; import { api } from '../api'
+const question=ref('差旅怎么报销？'),messages=ref([]),busy=ref(false),conversation=ref(null)
+async function ask(){if(!question.value.trim())return;const q=question.value;messages.value.push({role:'user',text:q});question.value='';busy.value=true;try{const r=await api('/api/chat',{method:'POST',body:JSON.stringify({question:q,conversation_id:conversation.value})});conversation.value=r.conversation_id;messages.value.push({role:'assistant',text:r.answer,mode:r.provider_mode,evidence:r.evidence})}catch(e){messages.value.push({role:'error',text:e.message})}finally{busy.value=false}}
+</script>
+<template><section class="chat"><div><div class="eyebrow">THREE-WAY ANSWERING</div><h1>智能问答</h1><p>本地知识、魔搭 MCP 与一般知识统一融合，并保留证据。</p></div><div class="messages card"><div v-if="!messages.length" class="empty">提出一个企业知识问题，答案会显示运行模式和引用来源。</div><article v-for="(m,i) in messages" :key="i" :class="m.role"><b>{{m.role==='user'?'你':'知识助手'}}</b><p>{{m.text}}</p><small v-if="m.mode">运行模式：{{m.mode}} · 引用 {{m.evidence.length}} 条</small></article></div><form class="composer" @submit.prevent="ask"><textarea v-model="question" placeholder="输入问题…" @keydown.ctrl.enter="ask"></textarea><button :disabled="busy">{{busy?'生成中…':'发送'}}</button></form></section></template>

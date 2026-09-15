@@ -1,0 +1,31 @@
+{
+  "version": "v3.1",
+  "architecture_document": "02_知识库管理平台_标准AI项目架构设计说明书.md",
+  "sha256": "A15D5947F2DCD34CF8A2B5567B7B963D222D7580FA3FB9B0A4EB742432057A43",
+  "required_directories": [
+    "backend/apps/api/knowledge_api",
+    "backend/packages/domain/knowledge_domain",
+    "backend/packages/application/knowledge_application",
+    "backend/packages/agent_harness/agent_harness",
+    "backend/packages/graphs/knowledge_graphs/document_ingestion",
+    "backend/packages/graphs/knowledge_graphs/knowledge_answer",
+    "backend/packages/providers/knowledge_providers",
+    "backend/packages/vector_store/knowledge_vector_store",
+    "backend/packages/persistence/knowledge_persistence",
+    "backend/apps/api/knowledge_api/routes"
+    ,"backend/apps/worker/knowledge_worker/tasks"
+  ],
+  "required_evidence": {
+    "backend/packages/graphs/knowledge_graphs/document_ingestion/state.py": ["class IngestionState"],
+    "backend/packages/graphs/knowledge_graphs/document_ingestion/graph.py": ["StateGraph", "build_document_ingestion_graph"],
+    "backend/packages/domain/knowledge_domain/authorization/service.py": ["AuthorizationService", "CROSS_TENANT", "EMPTY_ACL"],
+    "backend/packages/vector_store/knowledge_vector_store/contracts.py": ["VectorStore", "tenant_id", "index_version"],
+    "backend/packages/application/knowledge_application/auth_service.py": ["authz_version", "AuthenticationService"],
+    "backend/packages/graphs/knowledge_graphs/knowledge_answer/graph.py": ["StateGraph", "retrieve_local", "research_mcp", "generate_general"],
+    "backend/packages/persistence/knowledge_persistence/repositories.py": ["tenant_id", "OutboxRepository"]
+    ,"backend/apps/worker/knowledge_worker/tasks/ingestion.py": ["build_ingestion_graph", "active_version_id"]
+  },
+  "thin_entrypoints": {
+    "backend/apps/api/knowledge_api/main.py": 80
+  }
+}
