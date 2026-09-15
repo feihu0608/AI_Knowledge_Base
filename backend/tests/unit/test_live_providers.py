@@ -5,6 +5,7 @@ from zipfile import ZipFile
 import httpx
 
 from knowledge_providers.mcp import StreamableHttpMcpClient
+from knowledge_providers.document_parser import PlainTextDocumentParser, RoutingDocumentParser
 from knowledge_providers.mineru import MinerUApiProvider, MinerUParseError
 from knowledge_providers.siliconflow import SiliconFlowClient, SiliconFlowEmbeddingProvider, SiliconFlowReranker
 
@@ -184,3 +185,29 @@ def test_mineru_times_out_when_job_never_finishes() -> None:
         assert "timed out" in str(exc)
     else:
         raise AssertionError("unfinished MinerU jobs must time out")
+
+
+def test_routing_parser_handles_markdown_locally_and_rich_documents_with_mineru() -> None:
+    class RecordingMinerU:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def parse(self, *, filename: str, content: bytes):
+            self.calls.append(filename)
+            return PlainTextDocumentParser().parse(filename="converted.md", content=b"# converted")
+
+    mineru = RecordingMinerU()
+    parser = RoutingDocumentParser(mineru=mineru)
+
+    markdown = parser.parse(filename="policy.md", content="# 制度\n\n正文".encode())
+    rich_document = parser.parse(filename="policy.docx", content=b"office-bytes")
+
+    assert markdown.markdown.startswith("# 制度")
+    assert markdown.warnings == ["native_text_parser_used"]
+    assert rich_document.markdown == "# converted"
+    assert mineru.calls == ["policy.docx"]
+
+
+def test_plain_text_parser_accepts_gb18030() -> None:
+    artifact = PlainTextDocumentParser().parse(filename="legacy.txt", content="旧版文本".encode("gb18030"))
+    assert artifact.markdown == "旧版文本"

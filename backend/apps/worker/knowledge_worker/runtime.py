@@ -7,6 +7,7 @@ from knowledge_graphs.document_ingestion import build_document_ingestion_graph
 from knowledge_graphs.document_ingestion.runtime import IngestionRuntime
 from knowledge_persistence import Database
 from knowledge_providers.mock import MockDocumentAnalyzer, MockEmbeddingProvider, MockMinerUProvider
+from knowledge_providers.document_parser import RoutingDocumentParser
 from knowledge_providers.mineru import MinerUApiProvider
 from knowledge_providers.siliconflow import (
     SiliconFlowClient, SiliconFlowDocumentAnalyzer, SiliconFlowEmbeddingProvider,
@@ -23,9 +24,11 @@ def build_ingestion_graph():
     parser_mode = os.getenv("PARSER_MODE", "mock")
     ai_mode = os.getenv("AI_MODE", "mock")
     if parser_mode == "live":
-        mineru = MinerUApiProvider(
-            base_url=os.getenv("MINERU_BASE_URL", "https://mineru.net/api/v4"),
-            api_key=os.environ["MINERU_API_KEY"],
+        mineru = RoutingDocumentParser(
+            mineru=MinerUApiProvider(
+                base_url=os.getenv("MINERU_BASE_URL", "https://mineru.net/api/v4"),
+                api_key=os.environ["MINERU_API_KEY"],
+            ),
         )
     else:
         mineru = MockMinerUProvider()
