@@ -54,7 +54,15 @@ function emptyInviteDraft() {
 }
 
 function showError(exception) {
-  error.value = exception instanceof Error ? exception.message : String(exception || '操作失败')
+  if (exception instanceof Error && exception.message) {
+    error.value = exception.message
+    return
+  }
+  if (exception && typeof exception === 'object') {
+    error.value = exception.message || exception.detail || JSON.stringify(exception)
+    return
+  }
+  error.value = String(exception || '操作失败')
 }
 
 function closeModals() {
