@@ -150,7 +150,7 @@ def list_users(context: AccessContext = Depends(require_permission("organization
             "department_id": r.department_id,
             "department": departments.get(r.department_id, ""),
             "role": role_names.get(r.id, "未分配"),
-            "role_id": (role_ids.get(r.id) or [None])[0],
+            "role_id": (sorted(role_ids.get(r.id, [])) or [None])[0],
             "role_ids": sorted(role_ids.get(r.id, [])),
             "active": r.active,
         }
