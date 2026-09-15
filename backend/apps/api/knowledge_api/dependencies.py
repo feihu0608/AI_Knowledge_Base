@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from knowledge_application.auth_service import AuthenticationError, AuthenticationService
 from knowledge_application.ingestion_service import IngestionApplicationService
 from knowledge_application.chat_service import ChatApplicationService
+from knowledge_application.security import InvalidTokenError
 from knowledge_domain.authorization.models import AccessContext
 
 
@@ -41,7 +42,7 @@ def get_access_context(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required")
     try:
         return service.authenticate(session, credentials.credentials)
-    except AuthenticationError as exc:
+    except (AuthenticationError, InvalidTokenError) as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
 

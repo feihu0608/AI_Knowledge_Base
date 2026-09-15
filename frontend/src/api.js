@@ -11,6 +11,10 @@ export async function api(path, options = {}) {
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   const response = await fetch(path, {...options, headers})
   const body = await response.json().catch(() => ({}))
+  if (response.status === 401 && session.token) {
+    session.token = null
+    if (window.location.pathname !== '/') window.location.assign('/')
+  }
   if (!response.ok) throw new Error(body.detail || `请求失败（${response.status}）`)
   return body
 }
