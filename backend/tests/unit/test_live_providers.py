@@ -95,6 +95,7 @@ def test_mineru_upload_poll_and_markdown_contract() -> None:
         assert "authorization" not in request.headers
         if request.method == "PUT":
             assert request.content == b"document-bytes"
+            assert "content-type" not in request.headers
             return httpx.Response(200)
         return httpx.Response(200, content=_markdown_zip("# 标题\n\n<!-- page 1 -->\n正文"))
 

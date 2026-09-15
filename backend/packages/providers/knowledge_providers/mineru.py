@@ -51,7 +51,11 @@ class MinerUApiProvider:
         batch_id = slot.get("batch_id")
         if not batch_id or len(urls) != 1:
             raise MinerUParseError("MinerU did not provide one upload URL")
-        upload = self._files.put(urls[0], content=content, headers={"Content-Type": "application/octet-stream"})
+        # MinerU returns an OSS presigned URL whose signature does not include
+        # Content-Type.  Sending an extra content-type header makes OSS reject
+        # the request with SignatureDoesNotMatch/403, so keep the PUT headers
+        # empty and let httpx set only the payload length.
+        upload = self._files.put(urls[0], content=content)
         upload.raise_for_status()
 
         deadline = time.monotonic() + self.timeout_seconds
