@@ -30,8 +30,16 @@ class Department(TimestampMixin, Base):
 class DepartmentClosure(Base):
     __tablename__ = "department_closure"
     __table_args__ = (
-        ForeignKeyConstraint(["tenant_id", "ancestor_id"], ["departments.tenant_id", "departments.id"]),
-        ForeignKeyConstraint(["tenant_id", "descendant_id"], ["departments.tenant_id", "departments.id"]),
+        ForeignKeyConstraint(
+            ["tenant_id", "ancestor_id"],
+            ["departments.tenant_id", "departments.id"],
+            name="fk_department_closure_ancestor_department",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "descendant_id"],
+            ["departments.tenant_id", "departments.id"],
+            name="fk_department_closure_descendant_department",
+        ),
     )
     tenant_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     ancestor_id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -77,4 +85,3 @@ class RolePermission(Base):
     tenant_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     role_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     permission_code: Mapped[str] = mapped_column(String(120), primary_key=True)
-
