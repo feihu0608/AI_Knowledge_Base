@@ -33,6 +33,9 @@ class MilvusVectorStore:
                 consistency_level="Strong", enable_dynamic_field=True,
             )
 
+    def is_ready(self) -> bool:
+        return bool(self._client.has_collection(collection_name=self._collection))
+
     def upsert(self, records: Sequence[VectorRecord]) -> int:
         if not records:
             return 0

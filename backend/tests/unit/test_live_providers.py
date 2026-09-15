@@ -1,8 +1,11 @@
 import json
+from io import BytesIO
+from zipfile import ZipFile
 
 import httpx
 
 from knowledge_providers.mcp import StreamableHttpMcpClient
+from knowledge_providers.mineru import MinerUApiProvider, MinerUParseError
 from knowledge_providers.siliconflow import SiliconFlowClient, SiliconFlowEmbeddingProvider, SiliconFlowReranker
 
 
@@ -56,3 +59,128 @@ def test_streamable_http_mcp_initializes_lists_and_calls_search() -> None:
     result = client.call_search("Milvus")
     assert result["content"][0]["text"] == "result"
     assert methods == ["initialize", "notifications/initialized", "tools/list", "tools/call"]
+
+
+def _markdown_zip(markdown: str = "# 标题\n\n正文") -> bytes:
+    output = BytesIO()
+    with ZipFile(output, "w") as bundle:
+        bundle.writestr("result/full.md", markdown)
+    return output.getvalue()
+
+
+def test_mineru_upload_poll_and_markdown_contract() -> None:
+    api_calls = 0
+    file_requests: list[httpx.Request] = []
+
+    def api_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal api_calls
+        assert request.headers["authorization"] == "Bearer mineru-token"
+        if request.url.path.endswith("/file-urls/batch"):
+            api_calls += 1
+            payload = json.loads(request.content)
+            data_id = payload["files"][0]["data_id"]
+            api_handler.data_id = data_id
+            return httpx.Response(200, json={"code": 0, "data": {
+                "batch_id": "batch-a", "file_urls": ["https://objects.invalid/upload"],
+            }})
+        api_calls += 1
+        return httpx.Response(200, json={"code": 0, "data": {"extract_result": [{
+            "data_id": api_handler.data_id, "state": "done",
+            "full_zip_url": "https://objects.invalid/result.zip",
+        }]}})
+
+    def file_handler(request: httpx.Request) -> httpx.Response:
+        file_requests.append(request)
+        assert "authorization" not in request.headers
+        if request.method == "PUT":
+            assert request.content == b"document-bytes"
+            return httpx.Response(200)
+        return httpx.Response(200, content=_markdown_zip("# 标题\n\n<!-- page 1 -->\n正文"))
+
+    provider = MinerUApiProvider(
+        base_url="https://mineru.invalid/api/v4", api_key="mineru-token",
+        poll_interval_seconds=0, api_transport=httpx.MockTransport(api_handler),
+        file_transport=httpx.MockTransport(file_handler),
+    )
+    artifact = provider.parse(filename="demo.pdf", content=b"document-bytes")
+    assert artifact.markdown.startswith("# 标题")
+    assert artifact.page_count == 1
+    assert api_calls == 2
+    assert [request.method for request in file_requests] == ["PUT", "GET"]
+
+
+def test_mineru_surfaces_failed_parse() -> None:
+    def api_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/file-urls/batch"):
+            data_id = json.loads(request.content)["files"][0]["data_id"]
+            api_handler.data_id = data_id
+            return httpx.Response(200, json={"code": 0, "data": {
+                "batch_id": "batch-a", "file_urls": ["https://objects.invalid/upload"],
+            }})
+        return httpx.Response(200, json={"code": 0, "data": {"extract_result": [{
+            "data_id": api_handler.data_id, "state": "failed", "err_msg": "unsupported",
+        }]}})
+
+    provider = MinerUApiProvider(
+        base_url="https://mineru.invalid/api/v4", api_key="mineru-token", poll_interval_seconds=0,
+        api_transport=httpx.MockTransport(api_handler),
+        file_transport=httpx.MockTransport(lambda request: httpx.Response(200)),
+    )
+    try:
+        provider.parse(filename="bad.doc", content=b"bad")
+    except MinerUParseError as exc:
+        assert "unsupported" in str(exc)
+    else:
+        raise AssertionError("failed MinerU jobs must fail ingestion")
+
+
+def test_mineru_rejects_archive_without_markdown() -> None:
+    def api_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/file-urls/batch"):
+            data_id = json.loads(request.content)["files"][0]["data_id"]
+            api_handler.data_id = data_id
+            return httpx.Response(200, json={"code": 0, "data": {
+                "batch_id": "batch-a", "file_urls": ["https://objects.invalid/upload"],
+            }})
+        return httpx.Response(200, json={"code": 0, "data": {"extract_result": [{
+            "data_id": api_handler.data_id, "state": "done",
+            "full_zip_url": "https://objects.invalid/result.zip",
+        }]}})
+
+    output = BytesIO()
+    with ZipFile(output, "w") as bundle:
+        bundle.writestr("result.json", "{}")
+    provider = MinerUApiProvider(
+        base_url="https://mineru.invalid/api/v4", api_key="mineru-token", poll_interval_seconds=0,
+        api_transport=httpx.MockTransport(api_handler),
+        file_transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, content=output.getvalue())
+        ),
+    )
+    try:
+        provider.parse(filename="empty.pdf", content=b"document")
+    except MinerUParseError as exc:
+        assert "no Markdown" in str(exc)
+    else:
+        raise AssertionError("archives without Markdown must fail ingestion")
+
+
+def test_mineru_times_out_when_job_never_finishes() -> None:
+    def api_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/file-urls/batch"):
+            return httpx.Response(200, json={"code": 0, "data": {
+                "batch_id": "batch-a", "file_urls": ["https://objects.invalid/upload"],
+            }})
+        raise AssertionError("zero timeout must stop before polling")
+
+    provider = MinerUApiProvider(
+        base_url="https://mineru.invalid/api/v4", api_key="mineru-token", timeout_seconds=0,
+        poll_interval_seconds=0, api_transport=httpx.MockTransport(api_handler),
+        file_transport=httpx.MockTransport(lambda request: httpx.Response(200)),
+    )
+    try:
+        provider.parse(filename="slow.pdf", content=b"document")
+    except MinerUParseError as exc:
+        assert "timed out" in str(exc)
+    else:
+        raise AssertionError("unfinished MinerU jobs must time out")

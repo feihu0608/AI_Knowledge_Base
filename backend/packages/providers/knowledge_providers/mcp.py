@@ -17,6 +17,7 @@ class StreamableHttpMcpClient:
         self.url = url
         self._session_id: str | None = None
         self._request_id = 0
+        self._initialized = False
         self._client = httpx.Client(
             timeout=timeout_seconds, transport=transport,
             headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json, text/event-stream",
@@ -47,6 +48,8 @@ class StreamableHttpMcpClient:
         return self._decode(response).get("result", {})
 
     def initialize(self) -> None:
+        if self._initialized:
+            return
         self.request("initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
                                     "clientInfo": {"name": "ai-knowledge-base", "version": "0.1.0"}})
         headers = {"Mcp-Session-Id": self._session_id} if self._session_id else None
@@ -54,6 +57,7 @@ class StreamableHttpMcpClient:
             "jsonrpc": "2.0", "method": "notifications/initialized", "params": {},
         })
         response.raise_for_status()
+        self._initialized = True
 
     def call_search(self, query: str, *, tool_name: str = "") -> dict[str, Any]:
         self.initialize()

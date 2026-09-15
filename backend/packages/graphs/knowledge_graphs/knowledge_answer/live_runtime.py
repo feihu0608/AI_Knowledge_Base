@@ -54,6 +54,7 @@ def build_live_answer_runtime(settings, database) -> AnswerRuntime:
     vector_store = MilvusVectorStore(
         uri=settings.milvus_uri, token=settings.milvus_token or None, collection=settings.milvus_collection
     )
+    vector_store.ensure_collection(dimension=settings.embedding_dimension)
     local = AuthorizedMilvusRetriever(
         database=database, vector_store=vector_store, embedder=embedder, reranker=reranker,
         index_version=settings.index_version,
