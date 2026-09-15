@@ -37,18 +37,25 @@ def seed(database_url: str, password: str, *, create_schema: bool) -> None:
             if session.get(Tenant, tenant_id) is not None:
                 continue
             root_id, child_id, role_id = f"{tenant_id}-root", f"{tenant_id}-rd", f"{tenant_id}-admin"
+            session.add(Tenant(id=tenant_id, name=tenant_name))
+            session.flush()
             session.add_all([
-                Tenant(id=tenant_id, name=tenant_name),
                 Department(tenant_id=tenant_id, id=root_id, parent_id=None, name="总部"),
                 Department(tenant_id=tenant_id, id=child_id, parent_id=root_id, name="研发部"),
+            ])
+            session.flush()
+            session.add_all([
                 DepartmentClosure(tenant_id=tenant_id, ancestor_id=root_id, descendant_id=root_id, depth=0),
                 DepartmentClosure(tenant_id=tenant_id, ancestor_id=root_id, descendant_id=child_id, depth=1),
                 DepartmentClosure(tenant_id=tenant_id, ancestor_id=child_id, descendant_id=child_id, depth=0),
                 Role(tenant_id=tenant_id, id=role_id, code="tenant_admin", name="租户管理员"),
                 User(tenant_id=tenant_id, id=user_id, username=username, password_hash=hasher.hash(password),
                      department_id=child_id, authz_version=1, active=True),
-                UserRole(tenant_id=tenant_id, user_id=user_id, role_id=role_id),
                 KnowledgeBase(tenant_id=tenant_id, id=kb_id, name=kb_name, enabled=True),
+            ])
+            session.flush()
+            session.add_all([
+                UserRole(tenant_id=tenant_id, user_id=user_id, role_id=role_id),
                 *[RolePermission(tenant_id=tenant_id, role_id=role_id, permission_code=code)
                   for code in ADMIN_PERMISSIONS],
             ])
