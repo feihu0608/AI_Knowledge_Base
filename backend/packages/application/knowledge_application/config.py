@@ -72,7 +72,9 @@ class Settings:
             milvus_collection=os.getenv("MILVUS_COLLECTION", "knowledge_chunks_v1"),
             index_version=os.getenv("INDEX_VERSION", "bge-large-zh-v1.5-v1"),
             embedding_dimension=int(os.getenv("EMBEDDING_DIMENSION", "1024")),
-            auto_create_schema=_bool_env("AUTO_CREATE_SCHEMA", environment == "test"),
+            # Local development needs a usable empty database on first start;
+            # production and staging still require explicit migrations.
+            auto_create_schema=_bool_env("AUTO_CREATE_SCHEMA", environment in {"development", "test"}),
         )
         if settings.ai_mode == "live" and not settings.siliconflow_api_key:
             raise RuntimeError("SILICONFLOW_API_KEY is required when AI_MODE=live")

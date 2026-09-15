@@ -35,4 +35,6 @@ def test_seed_demo_respects_foreign_keys_and_is_idempotent(tmp_path):
     engine = create_engine(database_url)
     with Session(engine) as session:
         assert session.scalar(select(func.count()).select_from(Tenant)) == 2
-        assert session.scalar(select(func.count()).select_from(User)) == 2
+        # Each fictional tenant has one administrator plus three organization
+        # fixtures used by the organization management page.
+        assert session.scalar(select(func.count()).select_from(User)) == 8
