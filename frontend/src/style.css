@@ -7,3 +7,5 @@
 .tree-root{display:flex;align-items:center;gap:5px;position:relative}.tree-root>.tree-actions{margin-left:auto}.tree-actions{display:flex;gap:6px;opacity:.75}.tree-actions:hover{opacity:1}.action-button{padding:6px 10px;border-radius:7px;background:#eef6f1;color:#176b51;border:1px solid #d8e9de;font-size:11px;line-height:1.2}.action-button:hover{background:#dcefe4}.action-button.danger{background:#fff1f0;color:#b42318;border-color:#f3d1ce}.action-button.danger:hover{background:#ffe2df}
 
 .tree-root{display:block}.tree-root>.tree-actions{position:absolute;right:0;top:-4px}
+
+.tree-child{display:block;margin:14px 0 0 28px;padding-left:2px}.tree-child>.tree-actions{float:right}.tree-child:after{content:'';display:block;clear:both}.tree-child>.tree-child{margin-left:24px}

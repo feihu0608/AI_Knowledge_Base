@@ -23,7 +23,7 @@ const roles = ref([])
 const permissionOptions = ['organization.read','organization.admin','knowledge.read','knowledge.write','knowledge.admin','chat.use','faq.review','audit.read']
 
 const DepartmentNode = {
-  props: { item: Object, level: Number },
+  props: { item: Object, level: Number, onEdit: Function, onDelete: Function },
   setup(props) {
     return () => h('div', { class: props.level === 0 ? 'tree-root' : 'tree-child' }, [
       h('span', { class: 'tree-caret' }, props.item.children?.length ? '⌄' : ''),
@@ -170,9 +170,11 @@ async function createDepartment() {
 }
 
 async function deleteDepartment(department) {
-  if (!window.confirm(`确定删除部门「${department.name}」吗？空部门才可删除。`)) return
+  const hasChildren = department.children?.length
+  const message = hasChildren ? `部门「${department.name}」包含 ${department.children.length} 个下级部门，是否删除全部下级？点击取消将保留部门。` : `确定删除部门「${department.name}」吗？`
+  if (!window.confirm(message)) return
   try {
-    await api(`/api/organization/departments/${department.id}`, { method: 'DELETE' })
+    await api(`/api/organization/departments/${department.id}${hasChildren ? '?cascade=true' : ''}`, { method: 'DELETE' })
     notice.value = `部门「${department.name}」已删除`
     await load()
   } catch (exception) { showError(exception) }

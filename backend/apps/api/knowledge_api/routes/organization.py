@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -179,21 +179,31 @@ def update_department(department_id: str, payload: DepartmentUpdateRequest, cont
 
 
 @router.delete("/departments/{department_id}")
-def delete_department(department_id: str, context: AccessContext = Depends(require_permission("organization.admin")), session: Session = Depends(get_session)) -> dict:
+def delete_department(department_id: str, cascade: bool = Query(False), context: AccessContext = Depends(require_permission("organization.admin")), session: Session = Depends(get_session)) -> dict:
     row = session.get(Department, (context.tenant_id, department_id))
     if row is None:
         raise HTTPException(status_code=404, detail="department not found")
     if row.parent_id is None:
         raise HTTPException(status_code=400, detail="顶级部门不可删除")
-    if session.scalar(select(Department).where(Department.tenant_id == context.tenant_id, Department.parent_id == department_id)):
+    children = session.scalars(select(Department).where(Department.tenant_id == context.tenant_id, Department.parent_id == department_id)).all()
+    if children and not cascade:
         raise HTTPException(status_code=409, detail="请先删除或移动子部门")
-    if session.scalar(select(User).where(User.tenant_id == context.tenant_id, User.department_id == department_id)):
+    target_ids = {department_id}
+    if cascade:
+        changed = True
+        while changed:
+            changed = False
+            for child in session.scalars(select(Department).where(Department.tenant_id == context.tenant_id)).all():
+                if child.parent_id in target_ids and child.id not in target_ids:
+                    target_ids.add(child.id); changed = True
+    if session.scalar(select(User).where(User.tenant_id == context.tenant_id, User.department_id.in_(target_ids))):
         raise HTTPException(status_code=409, detail="部门仍有用户，请先转移用户")
     session.query(DepartmentClosure).filter(
         DepartmentClosure.tenant_id == context.tenant_id,
-        (DepartmentClosure.ancestor_id == department_id) | (DepartmentClosure.descendant_id == department_id),
+        DepartmentClosure.ancestor_id.in_(target_ids) | DepartmentClosure.descendant_id.in_(target_ids),
     ).delete(synchronize_session=False)
-    session.delete(row)
+    for department in session.scalars(select(Department).where(Department.tenant_id == context.tenant_id, Department.id.in_(target_ids))).all():
+        session.delete(department)
     session.commit()
     return {"id": department_id, "deleted": True}
 
