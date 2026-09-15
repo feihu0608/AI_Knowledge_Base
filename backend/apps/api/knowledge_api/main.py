@@ -13,6 +13,7 @@ from .routes.auth import router as auth_router
 from .routes.organization import router as organization_router
 from .routes.knowledge import router as knowledge_router
 from .routes.chat import router as chat_router
+from .routes.operations import router as operations_router
 
 
 def create_app(settings: Settings | None = None, database: Database | None = None) -> FastAPI:
@@ -23,6 +24,7 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.include_router(organization_router)
     app.include_router(knowledge_router)
     app.include_router(chat_router)
+    app.include_router(operations_router)
 
     @app.get("/api/health")
     def health() -> dict:
