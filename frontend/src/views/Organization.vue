@@ -5,7 +5,7 @@ const departments = [
   {name:'总部', code:'HQ', children:[{name:'研发部', code:'RD', members:28},{name:'运营部', code:'OPS', members:16},{name:'财务部', code:'FIN', members:9}]},
 ]
 const users = ref([{name:'林晓', username:'lin.xiao', dept:'研发部', role:'知识管理员', active:true},{name:'周宁', username:'zhou.ning', dept:'运营部', role:'业务用户', active:true},{name:'赵敏', username:'zhao.min', dept:'财务部', role:'审计员', active:false}])
-const roles = [{name:'系统管理员', desc:'平台配置、组织和全量审计', permissions:['组织管理','知识管理','AI 问答','运营审核','系统配置']},{name:'知识管理员', desc:'维护授权范围内知识与导入任务', permissions:['知识管理','导入审核','FAQ 审核']},{name:'业务用户', desc:'访问已授权知识并进行问答', permissions:['AI 问答','知识检索']}]
+const roles = [{name:'系统管理员', desc:'平台配置、组织和全量审计', permissions:['组织：增删改查','知识：增删改查','AI访问','运营审核','系统配置','审计查看']},{name:'知识管理员', desc:'维护授权范围内知识与导入任务', permissions:['知识：增删改查','导入审核','FAQ 审核','AI访问']},{name:'业务用户', desc:'访问已授权知识并进行问答', permissions:['知识：查看','AI访问']}]
 function save(){saved.value=true;setTimeout(()=>saved.value=false,2000)}
 </script>
 
