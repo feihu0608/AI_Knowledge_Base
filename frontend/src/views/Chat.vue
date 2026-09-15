@@ -3,12 +3,12 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { api } from '../api'
 
 const question = ref(''), messages = ref([]), busy = ref(false), conversation = ref(null), activeHistory = ref(null), notice = ref('')
-const history = ref([{ id: 'demo-1', title: '差旅报销需要哪些材料？', time: '今天 10:24' }, { id: 'demo-2', title: 'VPN 远程办公申请', time: '昨天 16:08' }, { id: 'demo-3', title: '采购合同审批节点', time: '9 月 12 日' }])
+const history = ref([])
 const suggestions = ['差旅怎么报销？', '如何申请远程办公 VPN？', '采购合同审批要经过哪些节点？', '新员工入职第一天需要做什么？']
 const chatTitle = computed(() => messages.value.find(item => item.role === 'user')?.text || '新的知识问答')
 const scroller = ref(null)
 function newChat() { messages.value = []; conversation.value = null; activeHistory.value = null; question.value = '' }
-async function loadHistory() { try { const rows = await api('/api/chat/conversations'); if (rows.length) history.value = rows.map(item => ({ id: item.id, title: item.title, time: new Date(item.updated_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })) } catch (_) {} }
+async function loadHistory() { try { const rows = await api('/api/chat/conversations'); history.value = rows.map(item => ({ id: item.id, title: item.title, time: new Date(item.updated_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })) } catch (_) { history.value = [] } }
 async function openHistory(item) { try { const result = await api(`/api/chat/conversations/${item.id}`); conversation.value = item.id; activeHistory.value = item.id; messages.value = result.messages.map(message => ({ role: message.role, text: message.content, evidence: [], warnings: [] })) } catch (e) { messages.value.push({ role: 'error', text: e.message }) } }
 function useSuggestion(value) { question.value = value; nextTick(() => document.querySelector('.composer textarea')?.focus()) }
 function looksLikeCode(text) { return /```|function |const |SELECT |import /.test(text || '') }
