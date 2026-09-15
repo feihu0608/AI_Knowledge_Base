@@ -13,3 +13,5 @@
 .tree-selected{background:#e8f5ed;border-radius:8px;padding:7px 8px;margin-left:-8px}.confirm-toast{position:fixed;right:28px;bottom:28px;z-index:50;width:360px;display:flex;gap:13px;padding:18px;background:#fff;border:1px solid #e2eae4;border-radius:14px;box-shadow:0 18px 50px #17382b2e}.confirm-icon{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#fff0df;color:#b87522;font-weight:800}.confirm-body{flex:1}.confirm-body b{font-size:14px}.confirm-body p{font-size:12px;margin:7px 0 13px}.confirm-actions{display:flex;justify-content:flex-end;gap:8px}
 
 .confirm-toast{right:18%;bottom:18%;transform:translateX(50%)}
+
+.confirm-toast{top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:420px}

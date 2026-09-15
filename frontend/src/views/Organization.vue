@@ -27,7 +27,7 @@ const permissionOptions = ['organization.read','organization.admin','knowledge.r
 const DepartmentNode = {
   props: { item: Object, level: Number, onSelect: Function, selectedId: String },
   setup(props) {
-    return () => h('div', { class: `${props.level === 0 ? 'tree-root' : 'tree-child'} ${props.selectedId === props.item.id ? 'tree-selected' : ''}`, onClick: () => props.onSelect?.(props.item) }, [
+    return () => h('div', { class: `${props.level === 0 ? 'tree-root' : 'tree-child'} ${props.selectedId === props.item.id ? 'tree-selected' : ''}`, onClick: (event) => { event.stopPropagation(); props.onSelect?.(props.item) } }, [
       h('span', { class: 'tree-caret' }, props.item.children?.length ? '⌄' : ''),
       h('span', { class: props.level === 0 ? 'folder' : 'folder light' }, '▰'),
       h('b', props.item.name),
