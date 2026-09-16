@@ -22,6 +22,6 @@ function logout(){ session.token = null; router.push('/login') }
       <div class="tenant-badge"><span class="status-dot"></span><div><b>远航科技</b><small>demo-acme · 试点租户</small></div></div>
       <button class="ghost" @click="logout">退出登录</button>
     </aside>
-    <main><header><b>企业知识工作台</b><span>多租户 · 权限隔离 · 可追溯引用</span></header><router-view /></main>
+    <main :class="{'chat-shell-main': route.path === '/chat'}"><header><b>企业知识工作台</b><span>多租户 · 权限隔离 · 可追溯引用</span></header><router-view /></main>
   </div>
 </template>
