@@ -60,15 +60,23 @@ class SiliconFlowClient:
 class SiliconFlowEmbeddingProvider:
     mode = ProviderMode.LIVE
 
-    def __init__(self, client: SiliconFlowClient, *, model: str) -> None:
-        self.client, self.model = client, model
+    def __init__(self, client: SiliconFlowClient, *, model: str, batch_size: int = 32) -> None:
+        if batch_size < 1:
+            raise ValueError("embedding batch_size must be positive")
+        self.client, self.model, self.batch_size = client, model, batch_size
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
-        data = self.client.post("/embeddings", {"model": self.model, "input": texts})
-        rows = sorted(data.get("data", []), key=lambda item: item.get("index", 0))
-        vectors = [[float(value) for value in row["embedding"]] for row in rows]
+        vectors: list[list[float]] = []
+        for offset in range(0, len(texts), self.batch_size):
+            batch = texts[offset:offset + self.batch_size]
+            data = self.client.post("/embeddings", {"model": self.model, "input": batch})
+            rows = sorted(data.get("data", []), key=lambda item: item.get("index", 0))
+            batch_vectors = [[float(value) for value in row["embedding"]] for row in rows]
+            if len(batch_vectors) != len(batch):
+                raise RuntimeError("embedding count mismatch")
+            vectors.extend(batch_vectors)
         if len(vectors) != len(texts):
             raise RuntimeError("embedding count mismatch")
         return vectors

@@ -1,4 +1,5 @@
 from knowledge_graphs.document_ingestion import IngestionRuntime, build_document_ingestion_graph
+from knowledge_graphs.document_ingestion.nodes import _chunk
 from knowledge_providers.mock import MockDocumentAnalyzer, MockEmbeddingProvider, MockMinerUProvider
 from knowledge_vector_store import InMemoryVectorStore
 
@@ -62,3 +63,13 @@ def test_unsupported_file_stops_before_provider_calls():
     )
     assert result["status"] == "failed"
     assert result["error_code"] == "unsupported_format"
+
+
+def test_chunker_splits_single_oversized_paragraph_for_embedding_limits():
+    source = "这是一个没有空行的长段落。" * 180
+
+    chunks = _chunk(source, max_chars=400, overlap_chars=40)
+
+    assert len(chunks) > 1
+    assert all(0 < len(item["text"]) <= 400 for item in chunks)
+    assert [item["ordinal"] for item in chunks] == list(range(len(chunks)))

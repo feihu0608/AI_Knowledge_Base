@@ -34,6 +34,30 @@ def test_siliconflow_embedding_and_rerank_contracts() -> None:
     assert all(request.headers["authorization"] == "Bearer test-token" for request in requests)
 
 
+def test_siliconflow_embedding_batches_large_documents() -> None:
+    batch_sizes: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        batch_sizes.append(len(body["input"]))
+        return httpx.Response(200, json={"data": [
+            {"index": index, "embedding": [float(index)]} for index in range(len(body["input"]))
+        ]})
+
+    provider = SiliconFlowEmbeddingProvider(
+        SiliconFlowClient(
+            base_url="https://provider.invalid/v1", api_key="test-token",
+            transport=httpx.MockTransport(handler),
+        ),
+        model="embedding-model", batch_size=2,
+    )
+
+    vectors = provider.embed(["一", "二", "三", "四", "五"])
+
+    assert batch_sizes == [2, 2, 1]
+    assert len(vectors) == 5
+
+
 def test_streamable_http_mcp_initializes_lists_and_calls_search() -> None:
     methods: list[str] = []
 

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_application.ingestion_service import IngestionApplicationService, IngestionRequestError
 from knowledge_domain.authorization.models import AccessContext
-from knowledge_persistence.models import Document, DocumentAclRow, ImportJob, KnowledgeBase
+from knowledge_persistence.models import Document, DocumentAclRow, DocumentVersion, ImportJob, KnowledgeBase
 
 from knowledge_api.dependencies import get_ingestion_service, get_session, require_permission
 
@@ -76,7 +76,26 @@ def list_documents(
     result = []
     for row in rows:
         acl = session.scalars(select(DocumentAclRow).where(DocumentAclRow.tenant_id == context.tenant_id, DocumentAclRow.document_id == row.id)).all()
-        result.append({"id": row.id, "title": row.title, "enabled": row.enabled, "acl_version": row.acl_version, "acl": [{"subject_type": x.subject_type, "subject_id": x.subject_id} for x in acl]})
+        version = session.scalar(select(DocumentVersion).where(
+            DocumentVersion.tenant_id == context.tenant_id,
+            DocumentVersion.document_id == row.id,
+        ).order_by(DocumentVersion.created_at.desc()).limit(1))
+        job = session.scalar(select(ImportJob).where(
+            ImportJob.tenant_id == context.tenant_id,
+            ImportJob.document_id == row.id,
+        ).order_by(ImportJob.created_at.desc()).limit(1))
+        result.append({
+            "id": row.id, "title": row.title, "enabled": row.enabled,
+            "retrievable": bool(row.enabled and row.active_version_id),
+            "active_version_id": row.active_version_id,
+            "version_status": version.status if version else None,
+            "import_stage": job.stage if job else None,
+            "error_code": job.error_code if job else None,
+            "source_filename": version.source_filename if version else None,
+            "updated_at": row.updated_at.isoformat(),
+            "acl_version": row.acl_version,
+            "acl": [{"subject_type": x.subject_type, "subject_id": x.subject_id} for x in acl],
+        })
     return result
 
 

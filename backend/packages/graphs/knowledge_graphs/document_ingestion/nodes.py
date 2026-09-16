@@ -9,8 +9,45 @@ from .runtime import IngestionRuntime
 from .state import IngestionState
 
 
-def _chunk(markdown: str, *, max_chars: int = 500) -> list[dict[str, Any]]:
-    paragraphs = [part.strip() for part in markdown.split("\n\n") if part.strip()]
+def _split_long_paragraph(text: str, *, max_chars: int, overlap_chars: int) -> list[str]:
+    """Split parser output that has no blank lines before it reaches the embedding API.
+
+    MinerU and Markdown exports can contain a whole table or section in one paragraph.
+    The previous chunker let such paragraphs exceed ``max_chars`` and SiliconFlow then
+    rejected the complete embedding request with HTTP 400.
+    """
+    if len(text) <= max_chars:
+        return [text]
+    pieces: list[str] = []
+    start = 0
+    sentence_marks = "。！？；.!?;\n"
+    while start < len(text):
+        hard_end = min(start + max_chars, len(text))
+        end = hard_end
+        if hard_end < len(text):
+            lower_bound = start + max_chars // 2
+            candidates = [text.rfind(mark, lower_bound, hard_end) for mark in sentence_marks]
+            boundary = max(candidates, default=-1)
+            if boundary >= lower_bound:
+                end = boundary + 1
+        piece = text[start:end].strip()
+        if piece:
+            pieces.append(piece)
+        if end >= len(text):
+            break
+        start = max(end - overlap_chars, start + 1)
+    return pieces
+
+
+def _chunk(markdown: str, *, max_chars: int = 400, overlap_chars: int = 40) -> list[dict[str, Any]]:
+    raw_paragraphs = [part.strip() for part in markdown.split("\n\n") if part.strip()]
+    paragraphs = [
+        piece
+        for paragraph in raw_paragraphs
+        for piece in _split_long_paragraph(
+            paragraph, max_chars=max_chars, overlap_chars=overlap_chars,
+        )
+    ]
     chunks: list[dict[str, Any]] = []
     buffer = ""
     for paragraph in paragraphs:
