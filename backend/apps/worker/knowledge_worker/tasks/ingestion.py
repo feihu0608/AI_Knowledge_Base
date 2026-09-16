@@ -25,6 +25,7 @@ def process_ingestion(event_id: str) -> dict:
             return {"status": "already_processed", "job_id": job.id}
         job.stage = "validating"
         job.completed_units = 0
+        job.error_code = None
         session.commit()
 
     try:
@@ -60,6 +61,7 @@ def process_ingestion(event_id: str) -> dict:
             document.active_version_id = version.id
             job.stage = "published"
             job.completed_units = job.total_units
+            job.error_code = None
             session.commit()
         return {"status": "published", "job_id": payload["job_id"], "chunks": len(result.get("chunks", []))}
     except Exception as exc:
