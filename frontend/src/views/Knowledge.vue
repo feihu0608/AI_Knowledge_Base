@@ -22,7 +22,7 @@ async function loadSelected() {
   if (!selected.value) return
   const [rows, imports] = await Promise.all([
     api(`/api/knowledge-bases/${selected.value.id}/documents`),
-    api(`/api/knowledge-bases/${selected.value.id}/imports`),
+    api(`/api/knowledge-bases/imports?knowledge_base_id=${encodeURIComponent(selected.value.id)}`),
   ])
   docs.value = rows.map(x=>({id:x.id,title:x.title,format:'DOC',category:'未分类',acl:x.acl?.length?`${x.acl.length} 条策略`:'未配置',updated:new Date().toLocaleDateString('zh-CN'),enabled:x.enabled}))
   jobs.value = imports.map(x => ({ ...x, progress: jobProgress(x) }))

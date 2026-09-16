@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -121,9 +121,9 @@ def get_import_job(
             "total_units": job.total_units, "error_code": job.error_code}
 
 
-@router.get("/{knowledge_base_id}/imports")
+@router.get("/imports")
 def list_import_jobs(
-    knowledge_base_id: str,
+    knowledge_base_id: str = Query(...),
     context: AccessContext = Depends(require_permission("knowledge.read")),
     session: Session = Depends(get_session),
 ) -> list[dict]:
