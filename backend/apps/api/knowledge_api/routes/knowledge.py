@@ -119,3 +119,28 @@ def get_import_job(
     return {"id": job.id, "document_id": job.document_id, "version_id": job.version_id,
             "stage": job.stage, "completed_units": job.completed_units,
             "total_units": job.total_units, "error_code": job.error_code}
+
+
+@router.get("/{knowledge_base_id}/imports")
+def list_import_jobs(
+    knowledge_base_id: str,
+    context: AccessContext = Depends(require_permission("knowledge.read")),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    if session.get(KnowledgeBase, (context.tenant_id, knowledge_base_id)) is None:
+        raise HTTPException(status_code=404, detail="knowledge base not found")
+    rows = session.execute(
+        select(ImportJob, Document).join(
+            Document,
+            (Document.tenant_id == ImportJob.tenant_id) & (Document.id == ImportJob.document_id),
+        ).where(
+            ImportJob.tenant_id == context.tenant_id,
+            Document.knowledge_base_id == knowledge_base_id,
+        ).order_by(ImportJob.created_at.desc()).limit(50)
+    ).all()
+    return [{
+        "id": job.id, "document_id": job.document_id, "version_id": job.version_id,
+        "title": document.title, "stage": job.stage, "completed_units": job.completed_units,
+        "total_units": job.total_units, "error_code": job.error_code,
+        "updated_at": job.updated_at.isoformat(),
+    } for job, document in rows]

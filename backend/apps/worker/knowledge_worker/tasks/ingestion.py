@@ -23,12 +23,22 @@ def process_ingestion(event_id: str) -> dict:
             raise RuntimeError("import aggregate is incomplete")
         if job.stage == "published":
             return {"status": "already_processed", "job_id": job.id}
-        job.stage = "processing"
+        job.stage = "validating"
+        job.completed_units = 0
         session.commit()
 
     try:
         content = storage.read(payload["object_key"])
-        result = build_ingestion_graph().invoke({
+        def persist_progress(stage: str, completed: int, total: int) -> None:
+            with database.session_factory() as progress_session:
+                progress_job = progress_session.get(ImportJob, (event.tenant_id, payload["job_id"]))
+                if progress_job is not None:
+                    progress_job.stage = stage
+                    progress_job.completed_units = completed
+                    progress_job.total_units = total
+                    progress_session.commit()
+
+        result = build_ingestion_graph(progress_callback=persist_progress).invoke({
             "tenant_id": event.tenant_id, "actor_id": "system-worker",
             "knowledge_base_id": document.knowledge_base_id, "document_id": document.id,
             "version_id": version.id, "filename": version.source_filename, "content": content,

@@ -26,16 +26,22 @@ def _chunk(markdown: str, *, max_chars: int = 500) -> list[dict[str, Any]]:
 
 
 def build_nodes(runtime: IngestionRuntime):
+    def report(stage: str, completed: int) -> None:
+        if runtime.progress_callback:
+            runtime.progress_callback(stage, completed, 7)
+
     def validate_file(state: IngestionState) -> dict:
         if not state["content"]:
             return {"stage": "failed", "status": "failed", "error_code": "empty_document"}
         extension = state["filename"].rsplit(".", 1)[-1].lower()
         if extension not in {"pdf", "md", "txt", "doc", "docx"}:
             return {"stage": "failed", "status": "failed", "error_code": "unsupported_format"}
+        report("parsing", 1)
         return {"stage": "validated"}
 
     def parse_document(state: IngestionState) -> dict:
         artifact = runtime.mineru.parse(filename=state["filename"], content=state["content"])
+        report("analyzing", 2)
         return {
             "stage": "parsed",
             "parsed_markdown": artifact.markdown,
@@ -47,14 +53,17 @@ def build_nodes(runtime: IngestionRuntime):
 
         artifact = MinerUArtifact(markdown=state["parsed_markdown"], page_count=1)
         analysis = runtime.analyzer.analyze(artifact)
+        report("chunking", 3)
         return {"stage": "analyzed", "analysis": analysis.model_dump()}
 
     def build_chunks(state: IngestionState) -> dict:
         chunks = _chunk(state["parsed_markdown"])
+        report("embedding", 4)
         return {"stage": "chunked", "chunks": chunks}
 
     def embed_chunks(state: IngestionState) -> dict:
         vectors = runtime.embedder.embed([chunk["text"] for chunk in state["chunks"]])
+        report("indexing", 5)
         return {"stage": "embedded", "embeddings": vectors}
 
     def index_chunks(state: IngestionState) -> dict:
@@ -74,12 +83,13 @@ def build_nodes(runtime: IngestionRuntime):
                 )
             )
         count = runtime.vector_store.upsert(records)
+        report("publishing", 6)
         return {"stage": "indexed", "indexed_count": count}
 
     def publish_version(state: IngestionState) -> dict:
         if state.get("indexed_count") != len(state.get("chunks", [])):
             return {"stage": "failed", "status": "failed", "error_code": "index_count_mismatch"}
+        report("published", 7)
         return {"stage": "published", "status": "succeeded"}
 
     return validate_file, parse_document, analyze_document, build_chunks, embed_chunks, index_chunks, publish_version
-

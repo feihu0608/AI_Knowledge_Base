@@ -20,7 +20,7 @@ database = Database(os.getenv("DATABASE_URL", "sqlite:///./storage/knowledge.db"
 storage = LocalObjectStorage(os.getenv("STORAGE_DIR", "storage/objects"))
 
 
-def build_ingestion_graph():
+def build_ingestion_graph(progress_callback=None):
     parser_mode = os.getenv("PARSER_MODE", "mock")
     ai_mode = os.getenv("AI_MODE", "mock")
     if parser_mode == "live":
@@ -48,4 +48,5 @@ def build_ingestion_graph():
         analyzer, embedder, vector_store = MockDocumentAnalyzer(), MockEmbeddingProvider(), InMemoryVectorStore()
     return build_document_ingestion_graph(IngestionRuntime(
         mineru=mineru, analyzer=analyzer, embedder=embedder, vector_store=vector_store,
+        progress_callback=progress_callback,
     ))
