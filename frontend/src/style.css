@@ -16,4 +16,4 @@
 
 .confirm-toast{top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:420px}
 
-.chat-page{height:calc(100vh - 72px);overflow:hidden}.chat-layout{height:100%;min-height:0}.chat-main{height:100%;min-height:0}.messages{min-height:0;overflow-y:auto}
+.chat-page{height:calc(100dvh - 90px);overflow:hidden}.chat-layout{height:100%;min-height:0}.chat-main{height:100%;min-height:0}.messages{min-height:0;overflow-y:auto}
